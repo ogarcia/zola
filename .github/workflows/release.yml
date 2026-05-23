@@ -135,7 +135,6 @@ jobs:
           files: artifacts/*
 
   Release-Container-Image:
-    needs: [Release]
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -157,21 +156,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+      # Distroless image (default target)
+      - name: Extract metadata for distroless image
+        id: meta-distroless
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: latest=false
 
-      - name: Build and push Docker image
+      - name: Build and push distroless image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
           push: true
-          build-args: |
-            USE_GH_RELEASE=true
-            ZOLA_RELEASE_VERSION=${{ github.ref_name }}
+          target: distroless
+          # No build args needed — builds from source
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-distroless.outputs.tags }}
+          labels: ${{ steps.meta-distroless.outputs.labels }}
+
+      # Alpine image
+      - name: Extract metadata for alpine image
+        id: meta-alpine
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern=v{{version}}-alpine
+
+      - name: Build and push alpine image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: .
+          push: true
+          target: alpine
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-alpine.outputs.tags }}
+          labels: ${{ steps.meta-alpine.outputs.labels }}
